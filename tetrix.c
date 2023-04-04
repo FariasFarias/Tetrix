@@ -1,8 +1,8 @@
 #include <stdio.h>
-#include <pthread.h>
 #include <stdlib.h>
 #include <time.h>
-#include <ncurses.h>
+#include <pthread.h>
+#include <ncursesw/ncurses.h>
 
 #define WIDTH 10
 #define HEIGHT 20

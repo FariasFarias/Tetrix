@@ -1,14 +1,7 @@
 {
     "files.associations": {
         "*.c": "c",
-        "ncurses.h": "c",
-        "stdio.h": "c"
-    },
-    "makefile.launchConfigurations": [
-        {
-            "cwd": "c:\\Users\\Farias\\Desktop\\tetrix",
-            "binaryPath": "c:\\Users\\Farias\\Desktop\\tetrix\\tetrix",
-            "binaryArgs": []
-        }
-    ]
+        "time.h": "c",
+        "ncurses.h": "c"
+    }
 }
