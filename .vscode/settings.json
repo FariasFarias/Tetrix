@@ -5,7 +5,8 @@
         "time.h": "c",
         "stdio.h": "c",
         "pthread.h": "c",
-        "ncurses.h": "c"
+        "ncurses.h": "c",
+        "functions_game.h": "c"
     },
     "makefile.launchConfigurations": [
         {
