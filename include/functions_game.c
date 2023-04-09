@@ -1413,7 +1413,8 @@ void show_about()
     mvprintw(2 + 4, COLS/ 3, "Create by @FariasFarias");
     mvprintw(3 + 4, COLS/ 3, "GitHub > https://github.com/FariasFarias");
     mvprintw(4 + 4, COLS/ 3, "Source > https://github.com/FariasFarias/Tetrix");
-    mvprintw(5 + 4, COLS/ 3, "This project was created for \nthe Introduction to Computer Science course - CS50 at Harvard.");
-    mvprintw(7 + 4, COLS/ 3, "https://cs50.harvard.edu/x/2023/");
+    mvprintw(6 + 4, COLS/ 3, "             This project was created for the             ");
+    mvprintw(7 + 4, COLS/ 3, "Introduction to Computer Science course - CS50 at Harvard.");
+    mvprintw(8 + 4, COLS/ 3, "https://cs50.harvard.edu/x/2023/");
     getch();
 }
