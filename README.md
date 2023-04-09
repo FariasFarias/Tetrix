@@ -1,4 +1,6 @@
-# Tetrix
+# tetrix
+#### Video Demo:  https://youtu.be/mNVrakzzTo0
+#### Description:
 
 Tetrix é um clone do jogo Tetris escrito em C usando as bibliotecas ncurses e pthreads.
 
@@ -36,3 +38,6 @@ You can find the latest compiled and ready-to-use version of the program at the 
 ## Project Objective
 
 This project was developed as part of the CS50 course at Harvard University.
+
+
+[def]: ttps://youtu.be/mNVrakzzTo
