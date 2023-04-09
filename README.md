@@ -2,13 +2,15 @@
 #### Video Demo:  https://youtu.be/mNVrakzzTo0
 #### Description:
 
-Tetrix é um clone do jogo Tetris escrito em C usando as bibliotecas ncurses e pthreads.
+Tetrix is a clone of the game Tetris written in C using the ncurses and pthreads libraries. It recreates the mechanics of the classic game, which presents a great challenge in understanding how a seemingly simple game can contain so much complexity, including things that are not visible, such as the necessary data structure for the game to exist.
 
-## Compilando o Programa
+Despite its simplicity, recreating a game like Tetris requires a lot of attention to detail since everything in the game happens very quickly, and also requires a lot of creativity to solve the problems that arise during the project.
 
-A compilação do programa para o Windows foi testada e funciona corretamente. No entanto, a compilação para o Linux ainda não foi testada e pode ter alguns problemas.
+"Some implementation details include a two-dimensional structure to simulate a board where the game pieces will move, and how the player will build their strategy, which must be allowed without putting limitations on the player.
 
-Para compilar o programa para Windows, é necessário instalar a biblioteca ncurses e pthreads usando o Mingw-get, que pode ser baixado no seguinte link: https://sourceforge.net/projects/mingw/files/Installer/. Após a instalação, você pode usar o comando `make` ou `make tetrix` para compilar o programa.
+Compiling the program for Windows has been tested and works correctly. However, compiling for Linux has not been tested yet and may have some issues.
+
+To compile the program for Windows, you need to install the ncurses and pthreads libraries using Mingw-get, which can be downloaded from the following link: https://sourceforge.net/projects/mingw/files/Installer/. After installation, you can use the make or make tetrix command to compile the program."
 
 ## Testando o Programa
 
