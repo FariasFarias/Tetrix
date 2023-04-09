@@ -1,7 +1,17 @@
 {
     "files.associations": {
         "*.c": "c",
+        "stdlib.h": "c",
         "time.h": "c",
+        "stdio.h": "c",
+        "pthread.h": "c",
         "ncurses.h": "c"
-    }
+    },
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "c:\\Users\\Farias\\Desktop\\tetrix",
+            "binaryPath": "c:\\Users\\Farias\\Desktop\\tetrix\\tetrix.exe",
+            "binaryArgs": []
+        }
+    ]
 }

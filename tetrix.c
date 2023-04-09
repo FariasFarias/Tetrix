@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 #include <ncursesw/ncurses.h>
@@ -7,8 +8,7 @@
 #define WIDTH 10
 #define HEIGHT 20
 
-//structs
-
+//struct coordinates
 typedef struct coord
 {
     int h;
@@ -16,6 +16,7 @@ typedef struct coord
 }
 coord;
 
+// struct for piece of game
 typedef struct piece
 {
     coord center;
@@ -27,6 +28,7 @@ typedef struct piece
 } 
 piece;
 
+//range for piece's
 typedef struct range
 {
     bool matrix[4][4];
@@ -34,96 +36,130 @@ typedef struct range
 range;
 
 
-// protótipos
+// prototypes
 void load_grid_to_buffer();
 void load_grid();
 void *update_screen();
 void spawn_piece_screen(piece p, int height, int width);
-void init_game();
-void complete_fall(int velocity);
+int init_game();
+int complete_fall(int velocity);
 void solidify_block();
 void update_frame_piece_falldown();
 void *input_control();
-piece create_piece(char name);
 void move_pieces(char direction);
 bool is_touching_edge(char edge);
 bool is_touching_solid(char side);
 void spawn_random_piece();
-void end_game();
+int exit_game();
 void eliminate_line();
 bool is_complete_line(int i);
-void start_gameplay(int level);
+void start_gameplay();
 void gravity_solid(int line);
 void rotate_piece();
-piece get_piece_from_range(range r);
 void clear_piece_from_grid();
 void drop_piece_instantly();
 void respawn_piece_screen(piece t);
 bool is_respawnenable(piece p);
+piece get_piece_from_range(range r);
+piece create_piece(char name);
+bool solidify_if_touch_bottom();
+int init_interface_game();
+void update_interface_game_points(int score, int lines, int level);
+void precipitate_piece();
+bool lose_game();
+void gameover();
+void interrupt_game();
+void print_piece_screen(piece p, int height, int width);
+void update_interface_pieces();
+void use_hold_piece();
+void print_hold_piece();
 
-//Threads
-pthread_t pth_update_scr; //thread update_screen
+//Thread ini to update screen
+pthread_t pth_update_scr; 
+
+//Thread to recive inputs control (UP, DOWN, RIGHT, LEFT, ESPACE)
 pthread_t pth_inp_ctrl; //thread input_control
 
+//ptheard mutex
+//update_screen
+pthread_mutex_t mutex_screen_update = PTHREAD_MUTEX_INITIALIZER;
 
-// global
-// 1 para bloco no ar
-// 2 para bloco solidificados
-int grid[HEIGHT][WIDTH];
+//update_grid
+pthread_mutex_t mutex_grid_update = PTHREAD_MUTEX_INITIALIZER;
+
+//update_global_var
+pthread_mutex_t mutex_globalvar_update = PTHREAD_MUTEX_INITIALIZER;
+
+// const to specify type block
 const int EMPTY = 0;
 const int BLOCK = 1;
 const int SOLID = 2;
 
-piece current_piece;
+// grid to save struct game
+int grid[HEIGHT][WIDTH];
 
-coord local_center_piece;
+// global Variables
+piece current_piece; //piece atual 
+piece hold_piece; //
+piece row_piece[3];//
+coord local_center_piece; //
 coord local_center_piece_aux;
 int current_velocity = 0;
-bool drop_piece = false;
-
+bool drop_piece = false; //drop piece instantly in game
+bool is_gameplay_run = true; 
+bool is_piece_falling = false;
+bool is_hold_enable = false;
+//points
+int line_points = 0;
+int level_points = 1;
+int score_points = 0;
+int next_level_lines = 10;
+int next_level_score = 100;
 
 int main(void)
 {
     //inicializar o jogo com grid e atualização de tela
-    init_game();
-    start_gameplay(0);
+    int init = init_game();
+    if (init != 0)
+    {   
+        exit_game();
+        return init;
+    }
 
-    pthread_join(pth_update_scr, NULL);
-    pthread_join(pth_inp_ctrl, NULL);
-
-    end_game();
-    return 0;
+    return exit_game();
 }
 
 
 /**
  * Insere os valores do vetor bidimensional na telabuffer do Ncurses.
  */
+//move(linha, coluna)
 void load_grid_to_buffer() 
 {
     // código que usa a matriz grid
     for (int i = 0; i < HEIGHT; i++)
     {
+        //line, column
+        int curser[2] = {3 + i, 15 + (COLS / 3) - 4};
+
         for (int j = 0; j < WIDTH; j++)
-        {
+        {   
+            move(curser[0], curser[1] + j);
             if (grid[i][j] == BLOCK)
             {
-
                 addch(ACS_BLOCK);
-                addch(' ');
             }
             else if (grid[i][j] == SOLID)
             {
                 addch('#');
-                addch(' ');
             }
             else
             {
-                addch(' ');
-                addch(' ');
+                addch('.');
             }
+            curser[1] ++;
         }
-        addch('\n');
+        
     }
 }
 
@@ -140,23 +176,25 @@ void load_grid()
     }
 }
 
+
 /**
  * Função executada pela thread de atualização de tela.
  * Atualiza a tela a cada 60ms enquanto a variável global
  */
-
 void *update_screen()
 {
-    while(true)
+    while(is_gameplay_run)
     {
-        clear();
-        move(0, 0);
         load_grid_to_buffer();
+        update_interface_game_points(score_points, line_points, level_points);
+        update_interface_pieces();
+        print_hold_piece();
         refresh();
         napms(60);
     }
     return NULL;
 }
+
 
 // Drops a piece on the screen
 void spawn_piece_screen(piece p, int height, int width)
@@ -177,7 +215,8 @@ void spawn_piece_screen(piece p, int height, int width)
 
     int zh = p.z.h;
     int zw = p.z.w;
-
+    //lock
+    pthread_mutex_lock(&mutex_grid_update);
     //CENTER
     grid[height + ch][width + cw] = BLOCK;
 
@@ -197,57 +236,83 @@ void spawn_piece_screen(piece p, int height, int width)
 
     // z
     grid[height + zh][width + zw] = BLOCK;
+    
+    //unlock
+    pthread_mutex_unlock(&mutex_grid_update);
     return;
 }
 
-void init_game()
+
+int init_game()
 {
     // definindo estrutura de dados bidimensional ("tabela")
     initscr(); //inicializa o terminal no modo curses
-    //raw(); // trava teclas ctrl + C e ctrl + z
-    cbreak();
+    raw(); // trava teclas ctrl + C e ctrl + z
     noecho(); // para não imprimir caracteres desnecessários
     keypad(stdscr, true); // ativa teclas especiais]
     //nodelay(stdscr, true);
     // colocar valores do grid como 0
     load_grid(); // preenche os valores vazio em grid
 
-
+    //init interface game
+    int rtn_init_interface = init_interface_game();
+    if ( rtn_init_interface != 0)
+    {
+        return -1;
+    }
+    
     //criando atualização de tela
-    pthread_create(&pth_update_scr, NULL, update_screen, NULL);
-    pthread_create(&pth_inp_ctrl, NULL, input_control, NULL);
+    int rtn_update_scr = pthread_create(&pth_update_scr, NULL, update_screen, NULL);
+
+    //criar espera de inputs
+    int rtn_in_ctrl = pthread_create(&pth_inp_ctrl, NULL, input_control, NULL);
+
+    //caso ocorra algum erro ao inicializa a threads
+    if (rtn_update_scr != 0 || rtn_in_ctrl != 0)
+    {
+        return -1;
+    }
+    
+    start_gameplay();
+    return 0;
+
 }
 
-//aplica gravidade aos blocos
-void complete_fall(int velocity)
-{
 
-    while(!drop_piece)
+//aplica gravidade aos blocos
+int complete_fall(int velocity)
+{
+    is_piece_falling = true;
+    is_hold_enable = true;
+    while(!drop_piece && is_gameplay_run)
     {
         update_frame_piece_falldown(); // cria frame de atualização de queda
         //se após o frame o bloco estiver tocando  em algo
-        if (is_touching_edge('b') || is_touching_solid('b'))
-        {
-            napms(1000);
-            solidify_block();
-            return;
-        }
         //atrazo após a iteração
         napms(1000 - velocity * 10);
-    }
-
-    while (drop_piece)
-    {
-        update_frame_piece_falldown();
-        if(is_touching_edge('b') || is_touching_solid('b'))
+    
+        
+        if (solidify_if_touch_bottom() || !is_piece_falling)
         {
-            solidify_block();
-            drop_piece = false;
-            return;
+            is_piece_falling = false;
+            return 0;
         }
     }
-    return;
+
+    while (drop_piece && is_gameplay_run)
+    {
+        update_frame_piece_falldown();
+        if(solidify_if_touch_bottom() || !is_piece_falling)
+        {
+            drop_piece = false;
+            is_piece_falling = false;
+            return 0;
+        }
+    }
+
+    return 0;
 }
+
 
 //generate a piece: L, J, I, T, O, S, Z
 piece create_piece(char name)
@@ -414,6 +479,7 @@ piece create_piece(char name)
     return p;
 }
 
+
 //Solidifica todos os blocos da tela
 void solidify_block()
 {
@@ -429,6 +495,7 @@ void solidify_block()
     }
     napms(6);
 }
+
 
 // Cria frame de atualização da queda de uma peça
 // a cada chamada a peça cai um bloco de altura
@@ -451,22 +518,25 @@ void update_frame_piece_falldown()
     }
 
     // update local_center_from_piece
-
     local_center_piece.h ++;
     local_center_piece_aux.h ++;
 
     return;
 }
 
+
 // Habilita teclas para controle
 void *input_control()
 {
     int key;
 
-    while (true)
+    while (is_gameplay_run)
     {
+        //lock
+        pthread_mutex_lock(&mutex_screen_update);
         key = getch();
-
+        pthread_mutex_unlock(&mutex_screen_update);
+        //unlock
         if (key != ERR)
         {            
             switch (key)
@@ -480,6 +550,7 @@ void *input_control()
                 break;
 
             case KEY_DOWN:
+                precipitate_piece();
                 break;
             
             case KEY_UP:
@@ -488,6 +559,17 @@ void *input_control()
 
             case ' ':
                 drop_piece_instantly();
+                break;
+
+            case 27:
+            case 26:
+            case 3:
+                interrupt_game();
+                break;
+
+            case 'q':
+            case 'Q':
+                use_hold_piece();
                 break;
 
             default:
@@ -500,12 +582,14 @@ void *input_control()
     return NULL;
 }
 
+
 //move blocks to left or right use "l" or "r"
 void move_pieces(char direction)
 {
     //caso mova para a esquerda
     if (direction == 'l' && !is_touching_edge('l') && !is_touching_solid('l'))
     {
+        pthread_mutex_lock(&mutex_grid_update);
         for (int i = HEIGHT - 1; i >= 0; i--)
         {
             for (int j = 0; j < WIDTH ; j++)
@@ -516,8 +600,8 @@ void move_pieces(char direction)
                     grid[i][j] = EMPTY;
                 }
             }
-            
         }
+        pthread_mutex_unlock(&mutex_grid_update);
 
         //update local_center_piece
         local_center_piece.w --;
@@ -526,30 +610,26 @@ void move_pieces(char direction)
     //caso mova para direita
     else if (direction == 'r' && !is_touching_edge('r') && !is_touching_solid('r'))
     {
+        pthread_mutex_lock(&mutex_grid_update);
         for (int i = HEIGHT - 1; i >= 0; i--)
         {
             for (int j = WIDTH - 1; j >= 0 ; j--)
             {
                 if (grid[i][j] == BLOCK)
                 {
-                    //pthread_mutex_lock(&mutex);
                     grid[i][j + 1] = BLOCK;
                     grid[i][j] = EMPTY;
-                    //pthread_mutex_unlock(&mutex);
                 }
             }
             
         }
         local_center_piece.w ++;
         local_center_piece_aux.w ++;
-    }
-
-    if (is_touching_edge('b') || is_touching_solid('b'))
-    {
-        napms(100);
-        solidify_block();
+        pthread_mutex_unlock(&mutex_grid_update);
     }
 }
+
+
 //edge left = 'l'
 //edge right = 'r'
 //edge bottom = 'b'
@@ -583,6 +663,7 @@ bool is_touching_edge(char edge)
     }
     return false;
 }
+
 
 //left 'l'
 //right 'r'
@@ -620,6 +701,7 @@ bool is_touching_solid(char side)
     return false;
 }
 
+
 void spawn_random_piece()
 {
     //definindo semente aleatória
@@ -628,9 +710,40 @@ void spawn_random_piece()
     //array de char
     char letter[7] = {'I', 'J', 'L', 'T', 'O', 'S', 'Z'};
 
-    current_piece = create_piece(letter[rand() % 7]);
+    // empty piece
+    piece empty_piece;
+    empty_piece.name_piece = ' ';
 
+    while (current_piece.name_piece == ' ' || row_piece[0].name_piece  == ' ' || row_piece[1].name_piece  == ' ' || row_piece[1].name_piece  == ' ')
+    {
+        piece p = create_piece(letter[rand() % 7]);
+
+
+        if (row_piece[1].name_piece == ' ')
+        {
+            row_piece[1] = row_piece[2];
+            row_piece[2] = empty_piece;
+        }
+
+        if (row_piece[0].name_piece == ' ')
+        {
+            row_piece[0] = row_piece[1];
+            row_piece[1] = empty_piece;
+        }
+
+        if (current_piece.name_piece == ' ')
+        {
+            current_piece = row_piece[0];
+            row_piece[0] = empty_piece;
+        }
+
+        if (row_piece[2].name_piece == ' ')
+        {
+            row_piece[2] = p;
+        }
+    }
     
+
 
     if (current_piece.name_piece == 'I' || current_piece.name_piece == 'O' || current_piece.name_piece == 'Z' || current_piece.name_piece == 'S')
     {
@@ -642,20 +755,31 @@ void spawn_random_piece()
     }
 }
 
-void end_game()
+
+int exit_game()
 {
+
+    pthread_join(pth_update_scr, NULL);
+    pthread_join(pth_inp_ctrl, NULL);
+    
     keypad(stdscr, false);
     echo();
     nodelay(stdscr, false);
-    endwin(); //libera memória alocada por initscr
+    noraw();
+    
+    return endwin();
 }
+
 
 void eliminate_line()
 {
+    int count_of_total_lines = 0;
     for (int i = 0; i < HEIGHT; i++)
     {
         if (is_complete_line(i))
         {
+            count_of_total_lines ++;
+
             for (int j = 0; j < WIDTH; j++)
             {
                 grid[i][j] = EMPTY;
@@ -663,10 +787,37 @@ void eliminate_line()
                 refresh(); 
             }
             gravity_solid(i);
+            line_points ++;
+            next_level_lines --;
         }
+    }
+    
+
+    if(count_of_total_lines >= 2)
+    {
+        next_level_score -= 10 * (count_of_total_lines + 1) * level_points;
+        score_points += 10 * (count_of_total_lines + 1) * level_points;
+    }
+    else
+    {
+        next_level_score -= 10 * count_of_total_lines * level_points;
+        score_points += 10 * count_of_total_lines * level_points;
+    }
+
+    if(next_level_lines <= 0)
+    {
+        next_level_lines = 10;
+        level_points ++;
+    }
+
+    if(next_level_score <= 0)
+    {
+        next_level_score = 100;
+        level_points ++;
     }
 
 }
+
 
 bool is_complete_line(int i)
 {
@@ -679,6 +830,7 @@ bool is_complete_line(int i)
     }
     return true;
 }
+
 
 //fazar gravidade na linha dos blocos
 void gravity_solid(int line)
@@ -697,20 +849,36 @@ void gravity_solid(int line)
     }
     
 }
+
+
 // @param level game
-void start_gameplay(int level)
+void start_gameplay()
 {
-    // set velocity default
+    //put empty piece in hold
+    piece empty_piece;
+    empty_piece.name_piece = ' ';
     
-    while (true)
+    hold_piece = empty_piece;
+    row_piece[0] = empty_piece;
+    row_piece[1] = empty_piece;
+    row_piece[2] = empty_piece;
+    current_piece = empty_piece;
+
+    // set velocity default
+    while (is_gameplay_run)
     {
-        current_velocity = 60 + level;    
-        spawn_random_piece();
-        complete_fall(current_velocity);
+        current_velocity = 40;
+        if (!is_piece_falling)
+        {
+            spawn_random_piece();
+            complete_fall(current_velocity + level_points * 2);
+            current_piece = empty_piece;
+        }
         eliminate_line();
-        napms(500);
+        napms(600);
     }
 }
+
 
 void rotate_piece()
 {
@@ -794,7 +962,8 @@ void rotate_piece()
     
     return;
 }
-             
+
+
 piece get_piece_from_range(range r)
 {
     coord coords[4];
@@ -866,6 +1035,7 @@ piece get_piece_from_range(range r)
     return temp_piece;
 }
 
+
 //limpa a tela de qualquer peça
 void clear_piece_from_grid()
 {
@@ -881,11 +1051,19 @@ void clear_piece_from_grid()
     }
 }
 
+
 //drop piece instantly
 void drop_piece_instantly()
-{    
+{
+    pthread_mutex_lock(&mutex_globalvar_update);
     drop_piece = true;
+    pthread_mutex_unlock(&mutex_globalvar_update);
+    napms(900);
+    pthread_mutex_lock(&mutex_globalvar_update);
+    drop_piece = false;
+    pthread_mutex_unlock(&mutex_globalvar_update);
 }
+
 
 void respawn_piece_screen(piece t)
 {
@@ -937,10 +1115,11 @@ void respawn_piece_screen(piece t)
     {
         local.h -= local.h;
     }
-    
+
     spawn_piece_screen(t, local.h, local.w);
     return;
 }
+
 
 bool is_respawnenable(piece p)
 {
@@ -994,4 +1173,237 @@ bool is_respawnenable(piece p)
     }
 
     return true;
+}
+
+
+bool solidify_if_touch_bottom()
+{
+    if (is_touching_edge('b') || is_touching_solid('b'))
+    {
+        solidify_block();
+        return true;
+    }
+    return false;
+}
+
+
+//init interface from game
+int init_interface_game()
+{
+    //open file interface "gamescreen.txt"
+    FILE *file;
+	char line[49];
+	file = fopen("resources/gamescreen.txt", "r");
+
+	// if erro in file
+	if(file == NULL)
+	{
+		printw("Erro ao carregar o arquivo.");
+		return -1 ;
+	}
+
+    //print file "gamescreen.txt"
+    int r = 0;
+    int c = (COLS / 3) - 4;
+    
+	while (fgets(line, sizeof(line), file) != NULL)
+	{
+        move(r, c);
+        pthread_mutex_lock(&mutex_screen_update);
+		for (int j = 0, n = strlen(line); j < n; j++)
+		{   
+			switch(line[j])
+			{
+				case 'p':
+					addch(ACS_ULCORNER);
+					break;
+				case '-':
+					addch(ACS_HLINE);
+					break;
+				case 'q':
+					addch(ACS_URCORNER);
+					break;
+				case 'b':
+					addch(ACS_LLCORNER);
+					break;
+				case 'd':
+					addch(ACS_LRCORNER);
+					break;
+				case 'i':
+					addch(ACS_VLINE);
+					break;
+				case 'e':
+					addch(ACS_LTEE);
+					break;
+				case '3':
+					addch(ACS_RTEE);
+					break;
+				default:
+					addch(line[j]);
+					break;
+			}
+            pthread_mutex_unlock(&mutex_screen_update);
+		}
+        r++;
+    }
+	//close file
+	fclose(file);
+
+	return 0;
+}
+
+
+void update_interface_game_points(int score, int lines, int level)
+{
+    char str_line[8];
+    sprintf(str_line, "%7d", lines);
+
+    char str_score[8];
+    sprintf(str_score, "%7d", score);
+
+    char str_level[8];
+    sprintf(str_level, "%7d", level);
+
+    
+    mvprintw(17, 5 + (COLS / 3) - 4,"%s", str_line);
+    mvprintw(21 , 5 + (COLS / 3) - 4,"%s", str_level);
+    mvprintw(13, 5 + (COLS / 3) - 4 ,"%s",str_score);
+    return;
+}
+
+
+void precipitate_piece()
+{
+    //lock
+    pthread_mutex_lock(&mutex_grid_update);
+    update_frame_piece_falldown();
+    pthread_mutex_unlock(&mutex_grid_update);
+    if (solidify_if_touch_bottom())
+    {
+        is_piece_falling = false;
+        return;
+    }
+    //unlock
+}
+
+bool lose_game()
+{   
+    bool rtn = false;
+
+    pthread_mutex_lock(&mutex_grid_update);
+    for (int i = 0; i < 1; i++)
+    {
+        for (int j = 3; j < 7; j++)
+        {
+            if (grid[i][j] == SOLID)
+            {
+                rtn = true;
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex_grid_update);
+    
+    return rtn;
+}
+
+void gameover()
+{
+    //todo
+    mvprintw(10, 10,"Game over");
+}
+
+
+void interrupt_game()
+{
+    pthread_mutex_lock(&mutex_globalvar_update);
+    is_gameplay_run = false;
+    pthread_mutex_unlock(&mutex_globalvar_update);
+}
+
+
+void update_interface_pieces()
+{
+    // 0
+    print_piece_screen(row_piece[0], 4, 38);
+    // 1
+    print_piece_screen(row_piece[1], 8, 38);
+
+    // 2
+    print_piece_screen(row_piece[2], 12, 38);
+}
+
+
+void print_piece_screen(piece p, int height, int width)
+{
+    ///clear local
+    for (int i = height; i < 3 + height; i++)
+    {
+        for (int j = width + (COLS /3) - 5; j < width + 7 + (COLS /3) - 5; j++)
+        {
+            mvprintw(i, j, " ");
+        }
+    }
+    
+    mvprintw(height + p.center.h, width + p.center.w + (COLS / 3) - 4, "#");
+    mvprintw(height + p.x.h, width + p.x.w + (COLS / 3) - 4, "#");
+    mvprintw(height + p.y.h, width + p.y.w +  (COLS / 3) - 4, "#");
+    mvprintw(height + p.z.h, width + p.z.w + (COLS / 3) - 4, "#");
+}
+
+
+void use_hold_piece()
+{
+    piece empty_piece;
+    empty_piece.name_piece = ' ';
+
+    if (hold_piece.name_piece == ' ' && is_piece_falling)
+    {
+        hold_piece = create_piece(current_piece.name_piece);
+        clear_piece_from_grid();
+        current_piece = row_piece[0];
+        is_piece_falling = false;
+    }
+    else if (is_hold_enable && is_piece_falling)
+    {
+        piece temp = create_piece(current_piece.name_piece);
+        clear_piece_from_grid();
+        current_piece = hold_piece;
+        hold_piece = temp;
+
+        if (current_piece.name_piece == 'I' || current_piece.name_piece == 'O' || current_piece.name_piece == 'Z' || current_piece.name_piece == 'S')
+        {
+            spawn_piece_screen(current_piece, -1, 3);
+        }
+        else
+        {
+            spawn_piece_screen(current_piece, 0, 3);
+        }
+
+        is_hold_enable = false;
+        is_piece_falling = true;
+    }
+}
+
+
+void print_hold_piece()
+{
+    piece p = hold_piece;
+    int height = 4;
+    int width = 7+ (COLS / 3) - 5;
+    
+    for (int i = height; i < height + 3; i++)
+    {
+        for (int j = width; j < 5 + width; j++)
+        {
+            mvprintw( i, j, " ");
+        }
+        
+    }
+    
+
+
+    mvprintw(height + p.center.h, width + p.center.w , "#");
+    mvprintw(height + p.x.h, width + p.x.w, "#");
+    mvprintw(height + p.y.h, width + p.y.w, "#");
+    mvprintw(height + p.z.h, width + p.z.w, "#");
 }

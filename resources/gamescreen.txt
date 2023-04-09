@@ -1,0 +1,26 @@
+ p--------------------------------------------q
+ i                                            i
+ i    HOLD    p-------------------q   NEXT    i
+ i  p-------q i                   i p-------q i
+ i  i       i i                   i i       i i
+ i  i       i i                   i i       i i
+ i  i       i i                   i i       i i
+ i  b-------d i                   i i       i i
+ i    USE <Q> i                   i i       i i
+ i            i                   i i       i i
+ i            i                   i i       i i
+ i    SCORE   i                   i i       i i
+ i  p-------q i                   i i       i i
+ i  i       i i                   i i       i i
+ i  b-------d i                   i i       i i
+ i    LINES   i                   i b-------d i
+ i  p-------q i                   i           i
+ i  i       i i                   i           i
+ i  b-------d i                   i           i
+ i    LEVEL   i                   i           i
+ i  p-------q i                   i           i
+ i  i       i i                   i           i
+ i  b-------d i                   i           i
+ i            b-------------------d           i
+ i                                            i
+ b--------------------------------------------d 
