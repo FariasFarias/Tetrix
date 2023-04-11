@@ -12,27 +12,6 @@ Compiling the program for Windows has been tested and works correctly. However, 
 
 To compile the program for Windows, you need to install the ncurses and pthreads libraries using Mingw-get, which can be downloaded from the following link: https://sourceforge.net/projects/mingw/files/Installer/. After installation, you can use the make or make tetrix command to compile the program."
 
-## Testando o Programa
-
-Você pode encontrar a versão mais recente do programa já compilado e pronto para uso no seguinte link: https://github.com/FariasFarias/Tetrix/releases.
-
-## Objetivo do Projeto
-
-Este projeto foi desenvolvido como parte do curso CS50 da Universidade de Harvard.
-
-
----
-
-# Tetrix
-
-Tetrix is a clone of the Tetris game written in C using the ncurses and pthreads libraries.
-
-## Compiling the Program
-
-The program compilation for Windows has been tested and works correctly. However, the compilation for Linux has not been tested yet and may have some issues.
-
-To compile the program for Windows, it is necessary to install the ncurses and pthreads libraries using Mingw-get, which can be downloaded from the following link: https://sourceforge.net/projects/mingw/files/Installer/. After installation, you can use the `make` or `make tetrix` command to compile the program.
-
 ## Testing the Program
 
 You can find the latest compiled and ready-to-use version of the program at the following link: https://github.com/FariasFarias/Tetrix/releases.
