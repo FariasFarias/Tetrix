@@ -186,13 +186,15 @@ int init_game()
     
     start_gameplay();
     return exit_game();
-
 }
 
 
 //aplica gravidade aos blocos
 int complete_fall(int velocity)
 {
+    piece empty_piece;
+    empty_piece.name_piece = ' ';
+
     is_piece_falling = true;
     is_hold_enable = true;
     while(!drop_piece && is_gameplay_run)
@@ -205,6 +207,7 @@ int complete_fall(int velocity)
         
         if (solidify_if_touch_bottom() || !is_piece_falling)
         {
+            current_piece = empty_piece;
             is_piece_falling = false;
             return 0;
         }
@@ -217,10 +220,10 @@ int complete_fall(int velocity)
         {
             drop_piece = false;
             is_piece_falling = false;
+            current_piece = empty_piece;
             return 0;
         }
     }
-
     return 0;
 }
 
@@ -787,12 +790,24 @@ void start_gameplay()
         }
         eliminate_line();
         napms(600);
+        if (lose_game())
+        {
+            clear();
+            gameover();
+            is_gameplay_run = false;
+            return;
+        }
     }
 }
 
 
 void rotate_piece()
 {
+    if (current_piece.name_piece == ' ')
+    {
+        return;
+    }
+
     // 'O' isnt rotate
     if (current_piece.name_piece == 'O')
     {
@@ -1210,7 +1225,10 @@ bool lose_game()
 void gameover()
 {
     //todo
-    mvprintw(10, 10,"Game over");
+    mvprintw(9, 10 + (COLS / 3),"===================");
+    mvprintw(10, 10 + (COLS / 3),"=== |GAME OVER| ===");
+    mvprintw(11, 10 + (COLS / 3),"===================");
+    napms(5000);
 }
 
 

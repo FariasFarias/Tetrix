@@ -4,6 +4,5 @@
 int main(void)
 {
     //inicializa jogo e retorna zero quando termina
-    
     return menu(); 
 }
